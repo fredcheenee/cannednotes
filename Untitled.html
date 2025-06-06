@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Copy Notepad Text</title>
+    <style>
+        body { 
+            font-family: Arial; 
+            max-width: 1200px; 
+            margin: 20px auto; 
+        }
+        nav {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .sheet-button {
+            padding: 8px 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .sheet-button:hover, .sheet-button.active {
+            background: #0056b3;
+        }
+        #textContainer { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
+            gap: 20px; 
+        }
+        .column { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 10px; 
+        }
+        .section { 
+            border: 1px solid #ccc; 
+            padding: 10px; 
+            background: #f9f9f9; 
+            cursor: pointer; 
+            white-space: pre-wrap; 
+            font-family: monospace; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: flex-start; 
+            max-width: 100%; 
+            overflow-wrap: break-word; 
+            word-break: break-all; 
+            box-sizing: border-box; 
+            max-height: 50px; 
+            overflow-y: auto; 
+        }
+        .section-text { 
+            flex-grow: 1; 
+            max-width: 100%; 
+            max-height: 130px; 
+            overflow-y: auto; 
+        }
+        .section:hover { 
+            background: #e0e0e0; 
+        }
+        .delete-button { 
+            padding: 5px 10px; 
+            background: #dc3545; 
+            color: white; 
+            border: none; 
+            cursor: pointer; 
+            font-size: 12px; 
+        }
+        .delete-button:hover { 
+            background: #b02a37; 
+        }
+        #message { 
+            margin-top: 10px; 
+            display: none; 
+        }
+        .success { 
+            color: green; 
+        }
+        .error { 
+            color: red; 
+        }
+        #inputText { 
+            width: 100%; 
+            padding: 8px; 
+            margin: 10px 0; 
+            font-family: monospace; 
+            box-sizing: border-box; 
+        }
+        #addButton { 
+            padding: 8px 16px; 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            cursor: pointer; 
+        }
+        #addButton:hover { 
+            background: #0056b3; 
+        }
+    </style>
+</head>
+<body>
+    <h1>Click Each Page to Switch</h1>
+    <nav id="sheetNav"></nav>
+    <div id="textContainer"></div>
+    <textarea id="inputText" rows="4" placeholder="Enter text to add as new section"></textarea>
+    <button id="addButton">Add New Section</button>
+    <div id="message"></div>
+
+    <script>
+        const textContainer = document.getElementById('textContainer');
+        const inputText = document.getElementById('inputText');
+        const addButton = document.getElementById('addButton');
+        const message = document.getElementById('message');
+        const sheetNav = document.getElementById('sheetNav');
+
+        // Initialize sheets with four fixed pages
+        let sheets = JSON.parse(localStorage.getItem('sheets') || '{}');
+        const pageNames = ['Page 1', 'Page 2', 'Page 3', 'Page 4'];
+        pageNames.forEach(page => {
+            if (!sheets[page]) {
+                sheets[page] = page === 'Page 1' 
+                    ? [`Sample notepad.txt content:\nThis is a sample text from a notepad file.\nYou can replace this with your actual file content.\nMultiple lines are preserved.`] 
+                    : [];
+            }
+        });
+        localStorage.setItem('sheets', JSON.stringify(sheets));
+
+        let activeSheet = localStorage.getItem('activeSheet') || 'Page 1';
+        if (!pageNames.includes(activeSheet)) {
+            activeSheet = 'Page 1';
+            localStorage.setItem('activeSheet', activeSheet);
+        }
+
+        const showMessage = (text, isError = false) => {
+            message.textContent = text;
+            message.className = isError ? 'error' : 'success';
+            message.style.display = 'block';
+            setTimeout(() => message.style.display = 'none', 2000);
+        };
+
+        function updateSheetNav() {
+            sheetNav.innerHTML = '';
+            pageNames.forEach(sheet => {
+                const button = document.createElement('button');
+                button.className = 'sheet-button';
+                button.textContent = sheet;
+                if (sheet === activeSheet) button.classList.add('active');
+                button.addEventListener('click', () => switchSheet(sheet));
+                sheetNav.appendChild(button);
+            });
+        }
+
+        function switchSheet(sheetName) {
+            activeSheet = sheetName;
+            localStorage.setItem('activeSheet', activeSheet);
+            rebuildSections();
+            updateSheetNav();
+        }
+
+        function getTargetColumn(index) {
+            const columnIndex = Math.floor(index / 10);
+            let column = textContainer.querySelector(`.column[data-column="${columnIndex}"]`);
+            if (!column) {
+                column = document.createElement('div');
+                column.className = 'column';
+                column.dataset.column = columnIndex;
+                textContainer.appendChild(column);
+            }
+            return column;
+        }
+
+        function addSection(text, index) {
+            const newSection = document.createElement('div');
+            newSection.className = 'section';
+            newSection.dataset.index = index;
+            newSection.innerHTML = `<span class="section-text">${text}</span><button class="delete-button">Delete</button>`;
+            const targetColumn = getTargetColumn(index);
+            targetColumn.appendChild(newSection);
+        }
+
+        function rebuildSections() {
+            textContainer.innerHTML = '';
+            sheets[activeSheet].forEach((text, index) => {
+                addSection(text, index);
+            });
+        }
+
+        textContainer.addEventListener('click', (e) => {
+            const section = e.target.closest('.section');
+            if (!section) return;
+
+            if (e.target.classList.contains('delete-button')) {
+                const index = parseInt(section.dataset.index);
+                sheets[activeSheet].splice(index, 1);
+                localStorage.setItem('sheets', JSON.stringify(sheets));
+                rebuildSections();
+                showMessage('Section deleted!');
+                return;
+            }
+
+            const text = section.querySelector('.section-text').innerText;
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => showMessage('Text copied!')).catch(() => fallbackCopy(text));
+            } else {
+                fallbackCopy(text);
+            }
+        });
+
+        addButton.addEventListener('click', () => {
+            const newText = inputText.value.trim();
+            if (newText) {
+                sheets[activeSheet].push(newText);
+                localStorage.setItem('sheets', JSON.stringify(sheets));
+                addSection(newText, sheets[activeSheet].length - 1);
+                inputText.value = '';
+                showMessage('New section added!');
+            } else {
+                showMessage('Please enter text to add.', true);
+            }
+        });
+
+        function fallbackCopy(text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.opacity = '0';
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showMessage('Text copied!');
+            } catch {
+                showMessage('Copy failed. Try manually.', true);
+            }
+            document.body.removeChild(textArea);
+        }
+
+        // Initialize
+        updateSheetNav();
+        rebuildSections();
+    </script>
+</body>
+</html>
